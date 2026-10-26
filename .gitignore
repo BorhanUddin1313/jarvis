@@ -1,0 +1,54 @@
+# --- Python basics ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- JARVIS project-specific ---
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+config/local.yaml
+
+# Biometric and camera data (never commit faces or footage)
+data/
+faces/
+embeddings/
+recordings/
+snapshots/
+*.npy
+*.pkl
+
+# Logs
+logs/
+*.log
+
+# Downloaded AI models (large, and re-downloadable)
+models/
+*.onnx
+*.gguf
+*.bin
+*.pt
+*.pth
+
+# Audio scratch files
+*.wav
+*.mp3
+!tests/fixtures/*.wav
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
