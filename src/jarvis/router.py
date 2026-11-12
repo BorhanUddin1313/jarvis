@@ -1,4 +1,5 @@
 import logging
+from typing import Callable
 
 from jarvis.skills.base import Skill
 
@@ -10,8 +11,13 @@ FALLBACK = "Sorry, I don't know how to do that yet. Type 'help' to see what I ca
 class Router:
     """Sends each command to the first skill that matches it."""
 
-    def __init__(self, skills: list[Skill]) -> None:
+    def __init__(
+        self,
+        skills: list[Skill],
+        fallback: Callable[[str], str] | None = None,
+    ) -> None:
         self.skills = skills
+        self._fallback = fallback
 
     def route(self, text: str) -> str:
         if text.strip().lower() == "help":
@@ -21,6 +27,10 @@ class Router:
             if skill.matches(text):
                 logger.debug("Routing to skill: %s", skill.name)
                 return skill.handle(text)
+
+        if self._fallback is not None:
+            logger.debug("No skill matched, using fallback")
+            return self._fallback(text)
 
         logger.debug("No skill matched")
         return FALLBACK

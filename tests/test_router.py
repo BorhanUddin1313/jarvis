@@ -39,3 +39,7 @@ def test_unknown_input_gets_fallback():
 def test_help_lists_skills():
     router = Router([FakeSkill("a", "apple", "got apple")])
     assert "a: fake a" in router.route("help")
+
+def test_fallback_handles_unmatched_text():
+    router = Router([FakeSkill("a", "apple", "got apple")], fallback=lambda text: f"llm: {text}")
+    assert router.route("what is python") == "llm: what is python"   
