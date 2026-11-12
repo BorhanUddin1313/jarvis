@@ -14,7 +14,8 @@ JOKES = {
 
 class JokeSkill(Skill):
     name = "joke"
-    description = "Tell a joke"
+    description = "Tell a joke. Use when the user asks for a joke or something funny."
+    direct = True
 
     def __init__(self, choose: Callable = random.choice) -> None:
         self._choose = choose

@@ -23,3 +23,16 @@ def test_clock_tells_time():
 def test_clock_tells_date():
     reply = ClockSkill(now=fixed_now).handle("what's the date")
     assert reply == "Today is Wednesday, October 28."
+
+def test_clock_tool_returns_date():
+    assert ClockSkill(now=fixed_now).run({"what": "date"}) == "Today is Wednesday, October 28."
+
+
+def test_clock_tool_defaults_to_time():
+    assert ClockSkill(now=fixed_now).run({}) == "It's 3:05 PM."
+
+
+def test_skill_describes_itself_as_tool():
+    spec = ClockSkill().as_tool()
+    assert spec["function"]["name"] == "clock"
+    assert "what" in spec["function"]["parameters"]["properties"]

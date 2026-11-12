@@ -9,7 +9,21 @@ DATE_WORDS = {"date", "day"}
 
 class ClockSkill(Skill):
     name = "clock"
-    description = "Tell the current time or date"
+    description = (
+        "Get the current local time or today's date. "
+        "Only use this when the user asks what time or date it is right now."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "what": {
+                "type": "string",
+                "enum": ["time", "date"],
+                "description": "Whether the user wants the time or the date.",
+            }
+        },
+        "required": ["what"],
+    }
 
     def __init__(self, now: Callable[[], datetime] = datetime.now) -> None:
         self._now = now
@@ -23,3 +37,6 @@ class ClockSkill(Skill):
             return f"Today is {now:%A, %B} {now.day}."
         hour = now.hour % 12 or 12
         return f"It's {hour}:{now:%M %p}."
+
+    def run(self, arguments: dict) -> str:
+        return self.handle(arguments.get("what", "time"))

@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from jarvis.brain import Brain
+from jarvis.brain import OFFLINE_REPLY, Brain
 from jarvis.config import Settings, load_settings
 from jarvis.llm.ollama import OllamaLLM
 from jarvis.logging_setup import setup_logging
@@ -15,11 +15,17 @@ logger = logging.getLogger(__name__)
 EXIT_WORDS = {"exit", "quit", "bye"}
 
 
-def build_router(settings: Settings) -> Router:
+def build_assistant(settings: Settings) -> tuple[Brain, Router]:
+    clock = ClockSkill()
+    joke = JokeSkill()
+
+    router = Router([joke, GreetingSkill(), clock], fallback=lambda text: OFFLINE_REPLY)
     llm = OllamaLLM(model=settings.llm_model, base_url=settings.ollama_url)
-    brain = Brain(llm)
-    skills = [JokeSkill(), GreetingSkill(), ClockSkill()]
-    return Router(skills, fallback=brain.ask)
+    
+    # Small models overuse tools, so only offer ones whose keywords match.
+    # Try shortlist=False once a larger model is available.
+    brain = Brain(llm, tools=[clock, joke], offline=router.route, shortlist=True)
+    return brain, router
 
 
 def main() -> None:
@@ -31,7 +37,7 @@ def main() -> None:
     settings = load_settings()
     logger.info("JARVIS starting up with model %s", settings.llm_model)
 
-    router = build_router(settings)
+    brain, router = build_assistant(settings)
     print("JARVIS ready. Type 'help' for commands, 'exit' to quit.")
 
     while True:
@@ -46,7 +52,8 @@ def main() -> None:
         if text.lower() in EXIT_WORDS:
             break
 
-        print(f"JARVIS: {router.route(text)}")
+        reply = router.route(text) if text.lower() == "help" else brain.ask(text)
+        print(f"JARVIS: {reply}")
 
     logger.info("JARVIS shutting down")
 

@@ -7,3 +7,4 @@ def setup_logging(level: int = logging.INFO) -> None:
     """Configure console logging for JARVIS."""
     logging.basicConfig(level=level, format=LOG_FORMAT, force=True)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
