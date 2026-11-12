@@ -1,5 +1,6 @@
 import argparse
 import logging
+from typing import Callable
 
 from jarvis.brain import OFFLINE_REPLY, Brain
 from jarvis.config import Settings, load_settings
@@ -10,7 +11,9 @@ from jarvis.skills.clock import ClockSkill
 from jarvis.skills.greeting import GreetingSkill
 from jarvis.skills.joke import JokeSkill
 from jarvis.voice.base import SilentSpeaker, Speaker, SpeechError
+from jarvis.voice.endpoint import Endpointer
 from jarvis.voice.piper_speaker import PiperSpeaker
+from jarvis.voice.wake import WakeWordDetector
 from jarvis.voice.whisper_listener import WhisperTranscriber
 
 logger = logging.getLogger(__name__)
@@ -50,20 +53,63 @@ def build_transcriber(settings: Settings, enabled: bool) -> WhisperTranscriber |
     return WhisperTranscriber.load(settings.whisper_model, settings.whisper_device)
 
 
-def read_command(transcriber: WhisperTranscriber | None) -> str:
-    """Get the next command, typed or spoken."""
+def build_wake_detector(settings: Settings, enabled: bool) -> WakeWordDetector | None:
+    if not enabled:
+        return None
+    logger.info("Loading wake word model")
+    return WakeWordDetector.load(threshold=settings.wake_threshold)
+
+
+def wake_beep() -> None:
+    import winsound
+
+    winsound.Beep(1000, 120)
+
+
+def follow_up_beep() -> None:
+    import winsound
+
+    winsound.Beep(1400, 60)
+
+
+def read_command(
+    transcriber: WhisperTranscriber | None,
+    detector: WakeWordDetector | None,
+    make_endpointer: Callable[[float], Endpointer],
+    settings: Settings,
+    follow_up: bool,
+) -> str:
+    """Get the next command: by wake word, follow-up, push-to-talk, or typing."""
     if transcriber is None:
         return input("You: ").strip()
 
-    typed = input("You (type, or press Enter to talk): ").strip()
-    if typed:
-        return typed
+    if detector is not None:
+        from jarvis.voice.wake_listener import listen_for_command
 
-    from jarvis.voice.recorder import record_until_enter
+        if follow_up:
+            print("(listening for a follow-up...)")
+            audio = listen_for_command(
+                detector,
+                lambda: make_endpointer(settings.follow_up_seconds),
+                on_wake=follow_up_beep,
+                require_wake=False,
+            )
+        else:
+            print("Say 'Hey Jarvis'... (Ctrl+C to quit)")
+            audio = listen_for_command(
+                detector, lambda: make_endpointer(5.0), on_wake=wake_beep
+            )
+    else:
+        typed = input("You (type, or press Enter to talk): ").strip()
+        if typed:
+            return typed
+        from jarvis.voice.recorder import record_until_enter
 
-    audio = record_until_enter()
+        audio = record_until_enter()
+
     heard = transcriber.transcribe(audio)
-    print(f"You said: {heard or '(nothing heard)'}")
+    if heard or not follow_up:
+        print(f"You said: {heard or '(nothing heard)'}")
     return heard
 
 
@@ -72,6 +118,7 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="show debug logs")
     parser.add_argument("--voice", action="store_true", help="speak replies out loud")
     parser.add_argument("--listen", action="store_true", help="push-to-talk speech input")
+    parser.add_argument("--wake", action="store_true", help="hands-free: say 'Hey Jarvis'")
     args = parser.parse_args()
 
     setup_logging(logging.DEBUG if args.debug else logging.INFO)
@@ -80,17 +127,27 @@ def main() -> None:
 
     brain, router = build_assistant(settings)
     speaker = build_speaker(settings, args.voice)
-    transcriber = build_transcriber(settings, args.listen)
-    print("JARVIS ready. Type 'help' for commands, 'exit' to quit.")
+    transcriber = build_transcriber(settings, args.listen or args.wake)
+    detector = build_wake_detector(settings, args.wake)
+
+    def make_endpointer(no_speech_timeout: float) -> Endpointer:
+        return Endpointer(
+            silence_threshold=settings.silence_threshold,
+            no_speech_timeout=no_speech_timeout,
+        )
+
+    print("JARVIS ready. Say or type 'exit' to quit.")
+    follow_up = False
 
     while True:
         try:
-            text = read_command(transcriber)
+            text = read_command(transcriber, detector, make_endpointer, settings, follow_up)
         except (EOFError, KeyboardInterrupt):
             print()
             break
 
         if not text:
+            follow_up = False  # silence ends the conversation
             continue
         if text.lower().strip(" .!") in EXIT_WORDS:
             break
@@ -101,6 +158,8 @@ def main() -> None:
             speaker.speak(reply)
         except Exception:
             logger.exception("Speaking failed")
+
+        follow_up = detector is not None  # stay in conversation after answering
 
     logger.info("JARVIS shutting down")
 

@@ -11,6 +11,9 @@ class Settings:
     voice_model: str = "models/en_GB-alan-medium.onnx"
     whisper_model: str = "base.en"
     whisper_device: str = "cpu"
+    wake_threshold: float = 0.5
+    silence_threshold: float = 0.003
+    follow_up_seconds: float = 6.0
 
 
 def load_settings() -> Settings:
@@ -22,4 +25,11 @@ def load_settings() -> Settings:
         voice_model=os.environ.get("JARVIS_VOICE_MODEL", defaults.voice_model),
         whisper_model=os.environ.get("JARVIS_WHISPER_MODEL", defaults.whisper_model),
         whisper_device=os.environ.get("JARVIS_WHISPER_DEVICE", defaults.whisper_device),
+        wake_threshold=float(os.environ.get("JARVIS_WAKE_THRESHOLD", defaults.wake_threshold)),
+        silence_threshold=float(
+            os.environ.get("JARVIS_SILENCE_THRESHOLD", defaults.silence_threshold)
+        ),
+        follow_up_seconds=float(
+            os.environ.get("JARVIS_FOLLOW_UP_SECONDS", defaults.follow_up_seconds)
+        ),
     )
